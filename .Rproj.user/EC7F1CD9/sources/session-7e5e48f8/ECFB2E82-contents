@@ -1,0 +1,17 @@
+#For Documentation ---
+
+Used Janitor package ":clean_names()" as columns that had colons 
+  ("race:AfricanAmerican", "race:Asian", etc.) were replaced with a dot "." as
+  colons are reserved as operators for generating sequences, thus if column names
+  remained with a colon, it would result errors when running in the Data Analysis
+  
+Removed duplicates with dplyr: distinct() to keep unique values while avoiding
+  inflated or distorted readings during Data Analysis
+  
+Reformatted values in smoking_history column (""former", "not current", and "ever"")
+  into "Former" as these values are redundant and if kept, can generated unecessary
+  labels in charts with low total values. Also reformatted "No_info" to "Unknown" to
+  remove any form of ambiguity and prevent misinterpretations when ran during analysis
+  
+Standardized
+
