@@ -1,4 +1,5 @@
-# Dependencies & Libraries
+# --- Install Dependencies & Libraries ---
+install.packages("lava", type = "binary") # REQUIRED ONLY FOR R-STUDIO APP, REMOVE IF RUNNING ON POSIT CLOUD
 install.packages(c("tidyverse", "janitor", "reshape2", "ggplot2", "caret", "pROC", "car", "shiny", "plotly"))
 
 library(tidyverse)
@@ -10,6 +11,7 @@ library(pROC)
 library(car)
 library(shiny)
 library(plotly)
+
 
 # --- Data Cleaning ---
 
@@ -111,11 +113,11 @@ round(prop.table(table(clean_data$diabetes)), 3)
 cohort_summary <- clean_data %>%
   group_by(diabetes) %>%
   summarise(
-    n            = n(),
-    avg_age      = mean(age),
-    avg_bmi      = mean(bmi),
-    avg_hba1c    = mean(hb_a1c_level),
-    avg_glucose  = mean(blood_glucose_level)
+    n           = n(),
+    avg_age     = mean(age),
+    avg_bmi     = mean(bmi),
+    avg_hba1c   = mean(hb_a1c_level),
+    avg_glucose = mean(blood_glucose_level)
   )
 print(cohort_summary)
 
@@ -123,19 +125,21 @@ print(cohort_summary)
 cor_matrix <- cor(clean_data %>% select(age, bmi, hb_a1c_level, blood_glucose_level))
 round(cor_matrix, 3)
 
-# Categorical frequency tables for Appendix B
+# Categorical frequency tables
 race_freq <- clean_data %>%
   count(race, name = "n") %>%
-  mutate(percentage = round((n / sum(n)) * 100, 2))
+  mutate(percentage = round((n / sum(n)) * 100, 2)) %>%
+  arrange(desc(n))
 print(race_freq)
 
 smoking_freq <- clean_data %>%
   count(smoking_history, name = "n") %>%
-  mutate(percentage = round((n / sum(n)) * 100, 2))
+  mutate(percentage = round((n / sum(n)) * 100, 2)) %>%
+  arrange(desc(n))
 print(smoking_freq)
 
 
-# --- Data Visualization ---
+# --- 6. Data Visualization ---
 
 # Figure 1: Distribution of Blood Glucose Levels by Diabetes Status
 ggplot(clean_data, aes(x = blood_glucose_level, fill = diabetes)) +
@@ -192,9 +196,56 @@ ggplot(comorbidity_summary, aes(x = comorbidity_profile, y = prevalence_pct, fil
   ) +
   theme_minimal()
 
-# Additional Visualizations (Included in Appendix B)
 
-# Extra 1: HbA1c Distribution by Diabetes Status
+# --- Additional Visualizations (Appendix B) ---
+
+# Extra 1: HbA1c Level S-Curve Graph
+hba1c_summary <- clean_data %>%
+  group_by(hb_a1c_level) %>%
+  summarise(
+    patients       = n(),
+    prevalence_pct = mean(diabetes == "Diabetic"),
+    .groups        = "drop"
+  )
+
+ggplot(clean_data, aes(x = hb_a1c_level, y = as.numeric(diabetes == "Diabetic"))) +
+  geom_smooth(
+    method = "glm",
+    method.args = list(family = "binomial"),
+    se = TRUE,
+    color = "#2b5c8f",
+    fill = "#a6bddb",
+    linewidth = 1.2
+  ) +
+  geom_point(
+    data = hba1c_summary,
+    aes(x = hb_a1c_level, y = prevalence_pct, size = patients),
+    inherit.aes = FALSE,
+    color = "#d95f02",
+    alpha = 0.9
+  ) +
+  geom_vline(xintercept = 6.6, linetype = "dashed", color = "red", linewidth = 0.9) +
+  annotate(
+    "text",
+    x = 6.75,
+    y = 0.55,
+    label = "HbA1c > 6.6%:\n100% Diabetic",
+    hjust = 0,
+    fontface = "bold",
+    color = "red",
+    size = 3.8
+  ) +
+  scale_y_continuous(labels = scales::label_percent(), limits = c(0, 1.05)) +
+  labs(
+    title = "Diabetes Probability and Prevalence by HbA1c Level",
+    subtitle = "Observed diabetes prevalence (orange points) and logistic regression S-curve (blue line)",
+    x = "HbA1c Level (%)",
+    y = "Diabetes Probability / Prevalence (%)",
+    size = "Patient Count"
+  ) +
+  theme_minimal()
+
+# Extra 2: Distribution of HbA1c Levels
 ggplot(clean_data, aes(x = hb_a1c_level, fill = diabetes)) +
   geom_histogram(bins = 25, alpha = 0.7, position = "identity") +
   scale_fill_manual(values = c("Non-Diabetic" = "#66c2a5", "Diabetic" = "#fc8d62")) +
@@ -207,7 +258,7 @@ ggplot(clean_data, aes(x = hb_a1c_level, fill = diabetes)) +
   ) +
   theme_minimal()
 
-# Extra 2: Age Distribution Across Smoking History and Diabetes Status
+# Extra 3: Age Distribution Across Smoking History
 ggplot(clean_data, aes(x = smoking_history, y = age, fill = diabetes)) +
   geom_boxplot(alpha = 0.8, outlier.size = 0.8) +
   scale_fill_brewer(palette = "Set2") +
@@ -220,36 +271,20 @@ ggplot(clean_data, aes(x = smoking_history, y = age, fill = diabetes)) +
   ) +
   theme_minimal()
 
-# Extra 3: Proportional Bar Chart of Diabetes by Smoking History
-ggplot(clean_data, aes(x = smoking_history, fill = diabetes)) +
-  geom_bar(position = "fill", alpha = 0.8) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_fill_brewer(palette = "Set2") +
+# Extra 4: BMI vs. Blood Glucose Level
+ggplot(clean_data, aes(x = bmi, y = blood_glucose_level, color = diabetes)) +
+  geom_point(alpha = 0.5, size = 1.5) +
+  scale_color_manual(values = c("Non-Diabetic" = "#66c2a5", "Diabetic" = "#fc8d62")) +
   labs(
-    title = "Diabetes Prevalence by Smoking History",
-    subtitle = "Proportion of diabetic vs. non-diabetic patients across smoking categories",
-    x = "Smoking History",
-    y = "Proportion",
-    fill = "Diabetes Status"
+    title = "BMI vs. Blood Glucose Level by Diabetes Status",
+    subtitle = "Comparing Body Mass Index and blood glucose concentration across cohorts",
+    x = "Body Mass Index (BMI)",
+    y = "Blood Glucose Level (mg/dL)",
+    color = "Diabetes Status"
   ) +
   theme_minimal()
 
-# Extra 4: Correlation Heatmap
-melted_cor <- melt(round(cor_matrix, 3))
-ggplot(melted_cor, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = value), color = "black", fontface = "bold") +
-  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), name = "Pearson\nCorrelation") +
-  labs(
-    title = "Correlation Heatmap of Continuous Variables",
-    subtitle = "Evaluating linear relationships among clinical metrics",
-    x = "",
-    y = ""
-  ) +
-  theme_minimal()
-
-
-# --- 7. Statistical Analysis / Predictive Modeling ---
+# --- Statistical Analysis / Predictive Modeling ---
 
 # Contingency table and Chi-Square test for Smoking History vs. Diabetes
 smoking_diabetes_table <- table(clean_data$smoking_history, clean_data$diabetes)
@@ -293,8 +328,10 @@ logit_fit <- glm(
 
 # Predicted probabilities and 0.5 cut-off class predictions on test set
 logit_prob <- predict(logit_fit, newdata = test, type = "response")
-logit_pred <- factor(ifelse(logit_prob > 0.5, "Diabetic", "Non-Diabetic"),
-                     levels = c("Non-Diabetic", "Diabetic"))
+logit_pred <- factor(
+  ifelse(logit_prob > 0.5, "Diabetic", "Non-Diabetic"),
+  levels = c("Non-Diabetic", "Diabetic")
+)
 
 # Confusion matrix and accuracy/precision/recall metrics
 cm <- confusionMatrix(logit_pred, test$diabetes, positive = "Diabetic")
@@ -317,9 +354,12 @@ coef_plot_data <- coef_df %>%
 ggplot(coef_plot_data, aes(x = Estimate, y = Variable)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   geom_point(color = "#2b5c8f", size = 3.5) +
-  geom_errorbarh(aes(xmin = Estimate - (1.96 * StdError),
-                     xmax = Estimate + (1.96 * StdError)),
-                 height = 0.25, color = "#2b5c8f", linewidth = 0.8) +
+  geom_errorbarh(
+    aes(xmin = Estimate - (1.96 * StdError), xmax = Estimate + (1.96 * StdError)),
+    height = 0.25,
+    color = "#2b5c8f",
+    linewidth = 0.8
+  ) +
   labs(
     title = "Predictor Effect Sizes in Logistic Regression",
     subtitle = "Log-odds estimates (Beta) with 95% Confidence Intervals",
@@ -329,7 +369,7 @@ ggplot(coef_plot_data, aes(x = Estimate, y = Variable)) +
   theme_minimal()
 
 
-# --- 8. Interactive Dashboard (Shiny App) ---
+# --- Interactive Dashboard (Shiny App) ---
 
 # Load optimized RDS dataset
 dataset_file <- "cleaned_diabetes_data.rds"
@@ -353,12 +393,13 @@ ui <- fluidPage(
         "chart_type",
         "Select Graph:",
         choices = c(
-          "Fig 1: Blood Glucose Histogram"      = "glucose_hist",
-          "Fig 2: Age vs. Mean BMI Trend"       = "age_bmi_trend",
-          "Fig 3: Comorbidity Prevalence"       = "comorbidity_bar",
-          "Extra: HbA1c Histogram"              = "hba1c_hist",
-          "Extra: Age by Smoking Boxplot"       = "smoking_box",
-          "Extra: BMI vs. Glucose Scatter"      = "bmi_glucose_scatter"
+          "Fig 1: Blood Glucose Histogram"               = "glucose_hist",
+          "Fig 2: Age vs. Mean BMI Trend"                = "age_bmi_trend",
+          "Fig 3: Comorbidity Prevalence"                = "comorbidity_bar",
+          "Extra: HbA1c Level S-Curve Graph"             = "hba1c_scurve",
+          "Extra: Distribution of HbA1c Levels"          = "hba1c_hist",
+          "Extra: Age Distribution Across Smoking History" = "smoking_box",
+          "Extra: BMI vs. Blood Glucose Level"           = "bmi_glucose_scatter"
         )
       ),
       hr(),
@@ -443,6 +484,52 @@ server <- function(input, output, session) {
         geom_col(width = 0.6) +
         scale_fill_brewer(palette = "Set2") +
         labs(title = "Diabetes Prevalence Across Comorbidity Profiles", x = "Comorbidity Profile", y = "Prevalence (%)") +
+        theme_minimal()
+      return(ggplotly(p))
+      
+    } else if (input$chart_type == "hba1c_scurve") {
+      hba1c_summary <- df %>%
+        group_by(hb_a1c_level) %>%
+        summarise(
+          patients       = n(),
+          prevalence_pct = mean(diabetes == "Diabetic"),
+          .groups        = "drop"
+        )
+      
+      p <- ggplot(df, aes(x = hb_a1c_level, y = as.numeric(diabetes == "Diabetic"))) +
+        geom_smooth(
+          method = "glm",
+          method.args = list(family = "binomial"),
+          se = TRUE,
+          color = "#2b5c8f",
+          fill = "#a6bddb",
+          linewidth = 1.2
+        ) +
+        geom_point(
+          data = hba1c_summary,
+          aes(x = hb_a1c_level, y = prevalence_pct, size = patients),
+          inherit.aes = FALSE,
+          color = "#d95f02",
+          alpha = 0.9
+        ) +
+        geom_vline(xintercept = 6.6, linetype = "dashed", color = "red", linewidth = 0.9) +
+        annotate(
+          "text",
+          x = 6.75,
+          y = 0.55,
+          label = "HbA1c reference: 6.6%",
+          hjust = 0,
+          fontface = "bold",
+          color = "red",
+          size = 3.8
+        ) +
+        scale_y_continuous(labels = scales::label_percent(), limits = c(0, 1.05)) +
+        labs(
+          title = "HbA1c Level S-Curve Graph",
+          x = "HbA1c Level (%)",
+          y = "Diabetes Probability / Prevalence (%)",
+          size = "Patient Count"
+        ) +
         theme_minimal()
       return(ggplotly(p))
       
